@@ -25,9 +25,6 @@
     { base: 360, rows: 6, cols: 9, fillPct: 0.8 },
   ];
   var COLOR_BRICK_ROW_PALETTE = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
-  // Placeholder until Task 15 wires the full currentLevelSpeed() formula (SPEC §8),
-  // which depends on bricksClearedThisLevel state that doesn't exist yet.
-  var BASE_SPEED = LEVELS[0].base;
 
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
@@ -35,6 +32,15 @@
   var state = 'idle';
   var frameCount = 0;
   var lastFrameTime = null;
+
+  // 0-based index into LEVELS; Task 17 will advance this on level clear.
+  var currentLevel = 0;
+
+  function rescaleVelocity(vx, vy, speed) {
+    var mag = Math.hypot(vx, vy);
+    var scale = speed / mag;
+    return { vx: vx * scale, vy: vy * scale };
+  }
 
   var paddleX = (CANVAS_W - PADDLE_W) / 2;
 
@@ -63,7 +69,8 @@
     if (state !== 'playing' || !ballWaiting) return;
     ballX = paddleX + PADDLE_W / 2;
     ballY = PADDLE_Y - BALL_RADIUS;
-    var v = window.Launch.generateLaunchVelocity(BASE_SPEED, Math.random);
+    var launchSpeed = window.Speed.currentLevelSpeed(currentLevel, bricksClearedThisLevel);
+    var v = window.Launch.generateLaunchVelocity(launchSpeed, Math.random);
     ballVx = v.vx;
     ballVy = v.vy;
     ballWaiting = false;
@@ -175,12 +182,16 @@
           ballY + BALL_RADIUS > b.y &&
           ballY - BALL_RADIUS < b.y + b.height;
         if (overlapsBrick) {
+          // Canonical pipeline (SPEC §9): reflect at V_pre -> guard (direction only,
+          // still V_pre) -> rescale to V_post using the post-increment brick count.
           var brickBounce = window.BrickCollision.resolveBrickCollision(ballX, ballY, BALL_RADIUS, ballVx, ballVy, b);
           var guardedBrick = window.AngleGuard.enforceAngleGuard(brickBounce.vx, brickBounce.vy);
-          ballVx = guardedBrick.vx;
-          ballVy = guardedBrick.vy;
           bricks.splice(bi, 1);
           bricksClearedThisLevel++;
+          var vPost = window.Speed.currentLevelSpeed(currentLevel, bricksClearedThisLevel);
+          var rescaledBrick = rescaleVelocity(guardedBrick.vx, guardedBrick.vy, vPost);
+          ballVx = rescaledBrick.vx;
+          ballVy = rescaledBrick.vy;
           break;
         }
       }
