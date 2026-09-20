@@ -15,7 +15,6 @@
   var PADDLE_W = 90;
   var PADDLE_H = 14;
   var PADDLE_Y = 720 - 40;
-  var PADDLE_KEY_SPEED = 400; // px/s
 
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
@@ -46,6 +45,30 @@
     if (dir) heldKeys.delete(dir);
   });
 
+  // Latest known pointer/touch x in logical canvas-space coordinates, or null if
+  // none has been seen yet. Only used when heldKeys is empty — see SPEC §4.
+  var pointerX = null;
+
+  function updatePointerXFromEvent(clientX, clientY) {
+    var rect = canvas.getBoundingClientRect();
+    var mapped = window.Coords.mapPointerToCanvas(clientX, clientY, rect, canvas.width, canvas.height);
+    pointerX = mapped.x;
+  }
+
+  canvas.addEventListener('mousemove', function (e) {
+    updatePointerXFromEvent(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener('touchstart', function (e) {
+    var t = e.touches[0];
+    if (t) updatePointerXFromEvent(t.clientX, t.clientY);
+  });
+
+  canvas.addEventListener('touchmove', function (e) {
+    var t = e.touches[0];
+    if (t) updatePointerXFromEvent(t.clientX, t.clientY);
+  });
+
   function updateButtonStates() {
     startBtn.disabled = state !== 'idle';
     pauseBtn.disabled = state !== 'playing' && state !== 'paused';
@@ -71,11 +94,12 @@
   function update(dt) {
     frameCount++;
 
-    if (heldKeys.size > 0) {
-      var net = (heldKeys.has('right') ? 1 : 0) - (heldKeys.has('left') ? 1 : 0);
-      paddleX += net * PADDLE_KEY_SPEED * dt;
-      paddleX = Math.min(Math.max(paddleX, 0), CANVAS_W - PADDLE_W);
-    }
+    paddleX = window.PaddleControl.computePaddleX({
+      currentX: paddleX,
+      heldKeys: heldKeys,
+      pointerX: pointerX,
+      dt: dt,
+    });
   }
 
   function render() {
