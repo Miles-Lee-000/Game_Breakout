@@ -9,6 +9,7 @@
   var ctx = canvas.getContext('2d');
   var startBtn = document.getElementById('startBtn');
   var pauseBtn = document.getElementById('pauseBtn');
+  var restartBtn = document.getElementById('restartBtn');
   var livesEl = document.getElementById('lives');
   var levelEl = document.getElementById('level');
 
@@ -183,6 +184,31 @@
     } else {
       return; // no-op outside playing/paused, per SPEC §2
     }
+    updateButtonStates();
+  });
+
+  restartBtn.addEventListener('click', function () {
+    // Always active, from any state (SPEC §2/§10): full reset back to level 1.
+    currentLevel = 0;
+    setLives(LIVES_START);
+    bricksClearedThisLevel = 0;
+    bricks = window.Bricks.generateBrickLayout(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0].fillPct, Math.random);
+    levelEl.textContent = 'Level 1 / ' + LEVELS.length;
+
+    paddleX = (CANVAS_W - PADDLE_W) / 2;
+    heldKeys.clear();
+    pointerX = null;
+
+    ballWaiting = true;
+    ballVx = 0;
+    ballVy = 0;
+
+    window.__debugMaxPenetration = { wall: 0, ceiling: 0, paddle: 0, brick: 0 };
+
+    state = 'idle';
+    // Timer-reset rule (SPEC §9): the next tick treats dt as fresh rather than
+    // inheriting however long the game had been running before this Restart.
+    lastFrameTime = null;
     updateButtonStates();
   });
 
