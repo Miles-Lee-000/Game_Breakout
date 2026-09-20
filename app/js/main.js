@@ -19,9 +19,15 @@
   var PADDLE_H = 14;
   var PADDLE_Y = 720 - 40;
   var BALL_RADIUS = 8;
+  var LEVELS = [
+    { base: 300, rows: 4, cols: 7, fillPct: 0.6 },
+    { base: 330, rows: 5, cols: 8, fillPct: 0.7 },
+    { base: 360, rows: 6, cols: 9, fillPct: 0.8 },
+  ];
+  var COLOR_BRICK_ROW_PALETTE = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
   // Placeholder until Task 15 wires the full currentLevelSpeed() formula (SPEC §8),
-  // which depends on level/bricksClearedThisLevel state that doesn't exist yet.
-  var BASE_SPEED = 300;
+  // which depends on bricksClearedThisLevel state that doesn't exist yet.
+  var BASE_SPEED = LEVELS[0].base;
 
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
@@ -42,6 +48,10 @@
   var ballVy = 0;
 
   var lives = LIVES_START;
+
+  // Bricks (PLAN.md Task 11/12). Only level 1's layout is generated for now; level
+  // progression and regeneration on level clear come in Task 17.
+  var bricks = window.Bricks.generateBrickLayout(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0].fillPct, Math.random);
 
   function setLives(n) {
     lives = n;
@@ -191,6 +201,12 @@
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillText('frame: ' + frameCount, 12, 24);
     ctx.fillText('state: ' + state, 12, 44);
+
+    for (var i = 0; i < bricks.length; i++) {
+      var brick = bricks[i];
+      ctx.fillStyle = COLOR_BRICK_ROW_PALETTE[brick.row % COLOR_BRICK_ROW_PALETTE.length];
+      ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+    }
 
     ctx.fillStyle = '#e5e7eb';
     ctx.strokeStyle = '#9ca3af';
