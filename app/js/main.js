@@ -52,6 +52,7 @@
   // Bricks (PLAN.md Task 11/12). Only level 1's layout is generated for now; level
   // progression and regeneration on level clear come in Task 17.
   var bricks = window.Bricks.generateBrickLayout(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0].fillPct, Math.random);
+  var bricksClearedThisLevel = 0;
 
   function setLives(n) {
     lives = n;
@@ -158,6 +159,25 @@
       ballY = reflected.y;
       ballVx = reflected.vx;
       ballVy = reflected.vy;
+
+      // Only one brick is resolved per frame (matches SPEC §9's "only one brick per
+      // substep" intent, ahead of Task 16's formal substepping).
+      for (var bi = 0; bi < bricks.length; bi++) {
+        var b = bricks[bi];
+        var overlapsBrick =
+          ballX + BALL_RADIUS > b.x &&
+          ballX - BALL_RADIUS < b.x + b.width &&
+          ballY + BALL_RADIUS > b.y &&
+          ballY - BALL_RADIUS < b.y + b.height;
+        if (overlapsBrick) {
+          var brickBounce = window.BrickCollision.resolveBrickCollision(ballX, ballY, BALL_RADIUS, ballVx, ballVy, b);
+          ballVx = brickBounce.vx;
+          ballVy = brickBounce.vy;
+          bricks.splice(bi, 1);
+          bricksClearedThisLevel++;
+          break;
+        }
+      }
 
       var paddleRect = { x: paddleX, y: PADDLE_Y, width: PADDLE_W, height: PADDLE_H };
       var overlapsPaddle =
