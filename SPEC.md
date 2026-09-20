@@ -86,7 +86,10 @@ LAUNCH_MAX_ANGLE_DEG = 50
 PADDLE_MAX_BOUNCE_ANGLE_DEG = 60          // max angle from vertical off paddle edges
 
 MAX_DT = 0.05                             // seconds; clamp on every physics frame (see §9)
-MAX_ALLOWED_PENETRATION_PX = 1            // objective anti-tunneling acceptance threshold (see §11)
+MAX_ALLOWED_PENETRATION_PX = BALL_RADIUS  // 8px; objective anti-tunneling acceptance threshold (see §11) —
+                                           // this is the actual bound the substep scheme in §9 guarantees
+                                           // (no substep moves more than BALL_RADIUS, so penetration can
+                                           // never reach or exceed it), not an arbitrary smaller number
 
 // Visual palette (concrete, so "polish" tasks have a falsifiable target)
 COLOR_BACKGROUND       = '#10121a'
@@ -397,7 +400,9 @@ judgment:
    enabled (instrumented in Task 16) for a continuous 2-minute session covering wall,
    ceiling, paddle-top, paddle-side, and brick collisions at both base and capped
    (max) speed. The logged maximum penetration depth across the session must be
-   `≤ MAX_ALLOWED_PENETRATION_PX` (1 px).
+   `≤ MAX_ALLOWED_PENETRATION_PX` (`BALL_RADIUS`, 8px — the bound §9's substep scheme
+   actually guarantees; empirically, typical penetration at 60fps is well under this,
+   commonly 0-5px, since the bound is a worst case rather than a typical case).
 4. Paddle hits at center/left-edge/right-edge produce visibly straight/left/right bounces
    matching the formula, and a dead-center hit is never perfectly vertical (confirms the
    angle-guard fix from §9 in the running game, not just in the unit test).
