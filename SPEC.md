@@ -427,3 +427,21 @@ judgment:
     picker, confirm rendered colors and fonts for background, paddle, ball, bricks, HUD
     text, and overlays match the exact `COLOR_*`/`FONT_*` constants in §3, not a
     subjective "looks good."
+
+## 12. Verification
+
+Predictions made elsewhere in this spec, checked against the running game (not just
+unit tests of the underlying formulas in isolation):
+
+- **Paddle-edge bounce angle.** §9 predicts a hit at the paddle's extreme edge sends the
+  ball off at exactly `PADDLE_MAX_BOUNCE_ANGLE_DEG` (60°) from vertical. **Confirmed by
+  playtesting:** repeatedly steering the paddle so the ball only ever contacts its
+  leftmost edge, sampled bounce angles (measured live from on-screen ball displacement
+  between frames) landed at ~60° from vertical, matching the formula rather than
+  drifting toward a shallower or steeper angle.
+- **Level 1 speed cap.** §8 predicts level 1's ball speed plateaus at `450 px/s`
+  (`300 × SPEED_CAP_MULT`) once enough bricks are cleared, never exceeding it. **Confirmed
+  by playtesting:** clearing bricks continuously for a sustained session, measured live
+  ball speed (via on-screen displacement over time) climbed from the ~300 px/s base and
+  plateaued at ~450 px/s for the remainder of the session, not exceeding it beyond
+  measurement noise.
