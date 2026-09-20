@@ -10,6 +10,7 @@
   var startBtn = document.getElementById('startBtn');
   var pauseBtn = document.getElementById('pauseBtn');
   var livesEl = document.getElementById('lives');
+  var levelEl = document.getElementById('level');
 
   // SPEC.md §3 constants needed so far.
   var CANVAS_W = 480;
@@ -26,15 +27,33 @@
   ];
   var COLOR_BRICK_ROW_PALETTE = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
 
-  // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
-  // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
-  // written to extend to those without changing this shape.
+  // States used so far: 'idle', 'playing', 'paused', 'levelClear', 'fail'. Task 18
+  // adds 'victory' — this state variable and updateButtonStates() already extend to
+  // it without changing shape (Start/Pause are already disabled in any state besides
+  // their own listed ones).
   var state = 'idle';
   var frameCount = 0;
   var lastFrameTime = null;
 
-  // 0-based index into LEVELS; Task 17 will advance this on level clear.
+  // 0-based index into LEVELS.
   var currentLevel = 0;
+  var LEVEL_CLEAR_DURATION = 1; // seconds, SPEC §2/§10
+  var levelClearTimer = 0;
+
+  function advanceLevel() {
+    if (currentLevel < LEVELS.length - 1) {
+      currentLevel++;
+      var cfg = LEVELS[currentLevel];
+      bricks = window.Bricks.generateBrickLayout(cfg.rows, cfg.cols, cfg.fillPct, Math.random);
+      bricksClearedThisLevel = 0;
+      ballWaiting = true;
+      levelEl.textContent = 'Level ' + (currentLevel + 1) + ' / ' + LEVELS.length;
+      state = 'playing';
+    } else {
+      state = 'victory'; // overlay rendering added in Task 18
+    }
+    updateButtonStates();
+  }
 
   function rescaleVelocity(vx, vy, speed) {
     var mag = Math.hypot(vx, vy);
@@ -72,6 +91,13 @@
   // progression and regeneration on level clear come in Task 17.
   var bricks = window.Bricks.generateBrickLayout(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0].fillPct, Math.random);
   var bricksClearedThisLevel = 0;
+
+  // Debug-only hook so integration tests can shrink the current level down to a few
+  // bricks instead of waiting for real gameplay to clear a full layout; not used by
+  // gameplay itself.
+  window.__debugSetBricks = function (newBricks) {
+    bricks = newBricks;
+  };
 
   function setLives(n) {
     lives = n;
@@ -205,6 +231,14 @@
         var guardedBrick = window.AngleGuard.enforceAngleGuard(brickBounce.vx, brickBounce.vy);
         bricks.splice(bi, 1);
         bricksClearedThisLevel++;
+
+        if (bricks.length === 0) {
+          state = 'levelClear';
+          levelClearTimer = LEVEL_CLEAR_DURATION;
+          updateButtonStates();
+          return true;
+        }
+
         var vPost = window.Speed.currentLevelSpeed(currentLevel, bricksClearedThisLevel);
         var rescaledBrick = rescaleVelocity(guardedBrick.vx, guardedBrick.vy, vPost);
         ballVx = rescaledBrick.vx;
@@ -304,14 +338,20 @@
     ctx.fill();
 
     if (state === 'paused') {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 32px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
-      ctx.textAlign = 'left';
+      drawOverlay('Paused', '#ffffff');
+    } else if (state === 'levelClear') {
+      drawOverlay('Level ' + (currentLevel + 1) + ' Cleared!', '#ffffff');
     }
+  }
+
+  function drawOverlay(text, color) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 32px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    ctx.textAlign = 'left';
   }
 
   function tick(now) {
@@ -326,6 +366,11 @@
 
     if (state === 'playing') {
       update(dt);
+    } else if (state === 'levelClear') {
+      levelClearTimer -= dt;
+      if (levelClearTimer <= 0) {
+        advanceLevel();
+      }
     }
     render();
 
