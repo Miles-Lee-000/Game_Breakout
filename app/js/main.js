@@ -1,7 +1,6 @@
-// Game loop skeleton (PLAN.md Task 3). Later tasks extend update()/render() with real
-// paddle/ball/brick simulation and rendering; for now this only proves the loop runs,
-// freezes on Pause, resumes on Pause again, and that Start/Pause behave correctly
-// (no-op + visually disabled) outside their active states, per SPEC §2's button table.
+// Breakout game loop and state machine (integrates the pure logic modules in app/js/
+// into a running game per SPEC.md's state machine, §2's button-availability table, and
+// §9's collision pipeline).
 (function () {
   'use strict';
 
@@ -33,7 +32,6 @@
   // it without changing shape (Start/Pause are already disabled in any state besides
   // their own listed ones).
   var state = 'idle';
-  var frameCount = 0;
   var lastFrameTime = null;
 
   // 0-based index into LEVELS.
@@ -316,8 +314,6 @@
   }
 
   function update(dt) {
-    frameCount++;
-
     paddleX = window.PaddleControl.computePaddleX({
       currentX: paddleX,
       heldKeys: heldKeys,
@@ -350,11 +346,6 @@
   function render() {
     ctx.fillStyle = '#10121a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = '#e5e7eb';
-    ctx.font = '16px system-ui, sans-serif';
-    ctx.fillText('frame: ' + frameCount, 12, 24);
-    ctx.fillText('state: ' + state, 12, 44);
 
     for (var i = 0; i < bricks.length; i++) {
       var brick = bricks[i];
