@@ -1,4 +1,4 @@
-# Game_breakout
+# Game_Breakout
 
 A Breakout game, built with Claude Code by the "AI method" (Modern Experimental Techniques, TIGP 2026, Project 1).
 
