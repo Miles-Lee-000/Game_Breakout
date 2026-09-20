@@ -42,6 +42,19 @@
     return { vx: vx * scale, vy: vy * scale };
   }
 
+  // Debug-only instrumentation (PLAN.md Task 16): the largest penetration depth ever
+  // observed at the moment of each collision type, i.e. how far the ball's bounding
+  // box had already crossed a boundary/rect before that collision's correction ran
+  // this substep. Read by the Task 22 objective anti-tunneling check
+  // (MAX_ALLOWED_PENETRATION_PX, SPEC §3/§11); not used by gameplay itself.
+  window.__debugMaxPenetration = { wall: 0, ceiling: 0, paddle: 0, brick: 0 };
+
+  function notePenetration(kind, depth) {
+    if (depth > window.__debugMaxPenetration[kind]) {
+      window.__debugMaxPenetration[kind] = depth;
+    }
+  }
+
   var paddleX = (CANVAS_W - PADDLE_W) / 2;
 
   // Ball state (PLAN.md Task 6/7). While waiting to launch, the ball has no velocity of
@@ -147,6 +160,101 @@
     updateButtonStates();
   });
 
+  // Advances the ball by exactly one substep (SPEC §9's anti-tunneling scheme: each
+  // substep's displacement never exceeds BALL_RADIUS before a collision check), doing
+  // one full move + all collision checks. Returns true if the caller should stop
+  // processing further substeps this frame (ball reset to waiting, or game over).
+  function stepBall(subDt) {
+    ballX += ballVx * subDt;
+    ballY += ballVy * subDt;
+
+    var preWallX = ballX;
+    var preWallY = ballY;
+    var reflected = window.Walls.reflectOffBoundaries(ballX, ballY, ballVx, ballVy, BALL_RADIUS, CANVAS_W);
+    ballX = reflected.x;
+    ballY = reflected.y;
+    ballVx = reflected.vx;
+    ballVy = reflected.vy;
+    if (reflected.hit.length > 0) {
+      if (reflected.hit.indexOf('ceiling') !== -1) {
+        notePenetration('ceiling', BALL_RADIUS - preWallY);
+      }
+      if (reflected.hit.indexOf('left') !== -1 || reflected.hit.indexOf('right') !== -1) {
+        var wallPen = reflected.hit.indexOf('left') !== -1 ? BALL_RADIUS - preWallX : preWallX - (CANVAS_W - BALL_RADIUS);
+        notePenetration('wall', wallPen);
+      }
+      var guardedWall = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
+      ballVx = guardedWall.vx;
+      ballVy = guardedWall.vy;
+    }
+
+    // Only one brick is resolved per substep, per SPEC §9.
+    for (var bi = 0; bi < bricks.length; bi++) {
+      var b = bricks[bi];
+      var ballLeft = ballX - BALL_RADIUS;
+      var ballRight = ballX + BALL_RADIUS;
+      var ballTop = ballY - BALL_RADIUS;
+      var ballBottom = ballY + BALL_RADIUS;
+      var overlapX = Math.min(ballRight, b.x + b.width) - Math.max(ballLeft, b.x);
+      var overlapY = Math.min(ballBottom, b.y + b.height) - Math.max(ballTop, b.y);
+      if (overlapX > 0 && overlapY > 0) {
+        notePenetration('brick', Math.min(overlapX, overlapY));
+        // Canonical pipeline (SPEC §9): reflect at V_pre -> guard (direction only,
+        // still V_pre) -> rescale to V_post using the post-increment brick count.
+        var brickBounce = window.BrickCollision.resolveBrickCollision(ballX, ballY, BALL_RADIUS, ballVx, ballVy, b);
+        var guardedBrick = window.AngleGuard.enforceAngleGuard(brickBounce.vx, brickBounce.vy);
+        bricks.splice(bi, 1);
+        bricksClearedThisLevel++;
+        var vPost = window.Speed.currentLevelSpeed(currentLevel, bricksClearedThisLevel);
+        var rescaledBrick = rescaleVelocity(guardedBrick.vx, guardedBrick.vy, vPost);
+        ballVx = rescaledBrick.vx;
+        ballVy = rescaledBrick.vy;
+        break;
+      }
+    }
+
+    var paddleRect = { x: paddleX, y: PADDLE_Y, width: PADDLE_W, height: PADDLE_H };
+    var paddleBallLeft = ballX - BALL_RADIUS;
+    var paddleBallRight = ballX + BALL_RADIUS;
+    var paddleBallTop = ballY - BALL_RADIUS;
+    var paddleBallBottom = ballY + BALL_RADIUS;
+    var paddleOverlapX = Math.min(paddleBallRight, paddleRect.x + paddleRect.width) - Math.max(paddleBallLeft, paddleRect.x);
+    var paddleOverlapY = Math.min(paddleBallBottom, paddleRect.y + paddleRect.height) - Math.max(paddleBallTop, paddleRect.y);
+    var overlapsPaddle = paddleOverlapX > 0 && paddleOverlapY > 0;
+
+    if (overlapsPaddle && ballVy > 0) {
+      notePenetration('paddle', Math.min(paddleOverlapX, paddleOverlapY));
+      var axis = window.CollisionAxis.resolveRectCollisionAxis(ballX, ballY, BALL_RADIUS, paddleRect);
+      if (axis === 'y') {
+        var bounce = window.PaddleBounce.paddleTopBounce(ballX, paddleRect.x, paddleRect.width, Math.hypot(ballVx, ballVy));
+        ballVx = bounce.vx;
+        ballVy = bounce.vy;
+        ballY = paddleRect.y - BALL_RADIUS;
+      } else {
+        var sideBounce = window.PaddleBounce.paddleSideBounce(ballVx, ballVy);
+        ballVx = sideBounce.vx;
+        ballVy = sideBounce.vy;
+        ballX = ballX < paddleRect.x + paddleRect.width / 2 ? paddleRect.x - BALL_RADIUS : paddleRect.x + paddleRect.width + BALL_RADIUS;
+      }
+      var guardedPaddle = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
+      ballVx = guardedPaddle.vx;
+      ballVy = guardedPaddle.vy;
+    }
+
+    if (ballY - BALL_RADIUS > CANVAS_H) {
+      setLives(lives - 1);
+      if (lives > 0) {
+        ballWaiting = true;
+      } else {
+        state = 'fail'; // overlay rendering added in Task 19
+        updateButtonStates();
+      }
+      return true;
+    }
+
+    return false;
+  }
+
   function update(dt) {
     frameCount++;
 
@@ -158,77 +266,12 @@
     });
 
     if (!ballWaiting) {
-      ballX += ballVx * dt;
-      ballY += ballVy * dt;
-
-      var reflected = window.Walls.reflectOffBoundaries(ballX, ballY, ballVx, ballVy, BALL_RADIUS, CANVAS_W);
-      ballX = reflected.x;
-      ballY = reflected.y;
-      ballVx = reflected.vx;
-      ballVy = reflected.vy;
-      if (reflected.hit.length > 0) {
-        var guardedWall = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
-        ballVx = guardedWall.vx;
-        ballVy = guardedWall.vy;
-      }
-
-      // Only one brick is resolved per frame (matches SPEC §9's "only one brick per
-      // substep" intent, ahead of Task 16's formal substepping).
-      for (var bi = 0; bi < bricks.length; bi++) {
-        var b = bricks[bi];
-        var overlapsBrick =
-          ballX + BALL_RADIUS > b.x &&
-          ballX - BALL_RADIUS < b.x + b.width &&
-          ballY + BALL_RADIUS > b.y &&
-          ballY - BALL_RADIUS < b.y + b.height;
-        if (overlapsBrick) {
-          // Canonical pipeline (SPEC §9): reflect at V_pre -> guard (direction only,
-          // still V_pre) -> rescale to V_post using the post-increment brick count.
-          var brickBounce = window.BrickCollision.resolveBrickCollision(ballX, ballY, BALL_RADIUS, ballVx, ballVy, b);
-          var guardedBrick = window.AngleGuard.enforceAngleGuard(brickBounce.vx, brickBounce.vy);
-          bricks.splice(bi, 1);
-          bricksClearedThisLevel++;
-          var vPost = window.Speed.currentLevelSpeed(currentLevel, bricksClearedThisLevel);
-          var rescaledBrick = rescaleVelocity(guardedBrick.vx, guardedBrick.vy, vPost);
-          ballVx = rescaledBrick.vx;
-          ballVy = rescaledBrick.vy;
-          break;
-        }
-      }
-
-      var paddleRect = { x: paddleX, y: PADDLE_Y, width: PADDLE_W, height: PADDLE_H };
-      var overlapsPaddle =
-        ballX + BALL_RADIUS > paddleRect.x &&
-        ballX - BALL_RADIUS < paddleRect.x + paddleRect.width &&
-        ballY + BALL_RADIUS > paddleRect.y &&
-        ballY - BALL_RADIUS < paddleRect.y + paddleRect.height;
-
-      if (overlapsPaddle && ballVy > 0) {
-        var axis = window.CollisionAxis.resolveRectCollisionAxis(ballX, ballY, BALL_RADIUS, paddleRect);
-        if (axis === 'y') {
-          var bounce = window.PaddleBounce.paddleTopBounce(ballX, paddleRect.x, paddleRect.width, Math.hypot(ballVx, ballVy));
-          ballVx = bounce.vx;
-          ballVy = bounce.vy;
-          ballY = paddleRect.y - BALL_RADIUS;
-        } else {
-          var sideBounce = window.PaddleBounce.paddleSideBounce(ballVx, ballVy);
-          ballVx = sideBounce.vx;
-          ballVy = sideBounce.vy;
-          ballX = ballX < paddleRect.x + paddleRect.width / 2 ? paddleRect.x - BALL_RADIUS : paddleRect.x + paddleRect.width + BALL_RADIUS;
-        }
-        var guardedPaddle = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
-        ballVx = guardedPaddle.vx;
-        ballVy = guardedPaddle.vy;
-      }
-
-      if (ballY - BALL_RADIUS > CANVAS_H) {
-        setLives(lives - 1);
-        if (lives > 0) {
-          ballWaiting = true;
-        } else {
-          state = 'fail'; // overlay rendering added in Task 19
-          updateButtonStates();
-        }
+      var speed = Math.hypot(ballVx, ballVy);
+      var n = window.Substep.computeSubstepCount(speed, dt, BALL_RADIUS);
+      var subDt = dt / n;
+      for (var s = 0; s < n; s++) {
+        var shouldStop = stepBall(subDt);
+        if (shouldStop || ballWaiting) break;
       }
     }
   }
