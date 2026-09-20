@@ -159,6 +159,11 @@
       ballY = reflected.y;
       ballVx = reflected.vx;
       ballVy = reflected.vy;
+      if (reflected.hit.length > 0) {
+        var guardedWall = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
+        ballVx = guardedWall.vx;
+        ballVy = guardedWall.vy;
+      }
 
       // Only one brick is resolved per frame (matches SPEC §9's "only one brick per
       // substep" intent, ahead of Task 16's formal substepping).
@@ -171,8 +176,9 @@
           ballY - BALL_RADIUS < b.y + b.height;
         if (overlapsBrick) {
           var brickBounce = window.BrickCollision.resolveBrickCollision(ballX, ballY, BALL_RADIUS, ballVx, ballVy, b);
-          ballVx = brickBounce.vx;
-          ballVy = brickBounce.vy;
+          var guardedBrick = window.AngleGuard.enforceAngleGuard(brickBounce.vx, brickBounce.vy);
+          ballVx = guardedBrick.vx;
+          ballVy = guardedBrick.vy;
           bricks.splice(bi, 1);
           bricksClearedThisLevel++;
           break;
@@ -199,6 +205,9 @@
           ballVy = sideBounce.vy;
           ballX = ballX < paddleRect.x + paddleRect.width / 2 ? paddleRect.x - BALL_RADIUS : paddleRect.x + paddleRect.width + BALL_RADIUS;
         }
+        var guardedPaddle = window.AngleGuard.enforceAngleGuard(ballVx, ballVy);
+        ballVx = guardedPaddle.vx;
+        ballVy = guardedPaddle.vy;
       }
 
       if (ballY - BALL_RADIUS > CANVAS_H) {
