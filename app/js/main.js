@@ -10,12 +10,41 @@
   var startBtn = document.getElementById('startBtn');
   var pauseBtn = document.getElementById('pauseBtn');
 
+  // SPEC.md §3 constants needed so far.
+  var CANVAS_W = 480;
+  var PADDLE_W = 90;
+  var PADDLE_H = 14;
+  var PADDLE_Y = 720 - 40;
+  var PADDLE_KEY_SPEED = 400; // px/s
+
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
   // written to extend to those without changing this shape.
   var state = 'idle';
   var frameCount = 0;
   var lastFrameTime = null;
+
+  var paddleX = (CANVAS_W - PADDLE_W) / 2;
+
+  // Tracks currently-held movement keys via keydown(add)/keyup(remove) rather than
+  // relying on the browser re-firing keydown for a held key — see SPEC §4.
+  var heldKeys = new Set();
+
+  function keyToDirection(key) {
+    if (key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
+    if (key === 'ArrowRight' || key === 'd' || key === 'D') return 'right';
+    return null;
+  }
+
+  window.addEventListener('keydown', function (e) {
+    var dir = keyToDirection(e.key);
+    if (dir) heldKeys.add(dir);
+  });
+
+  window.addEventListener('keyup', function (e) {
+    var dir = keyToDirection(e.key);
+    if (dir) heldKeys.delete(dir);
+  });
 
   function updateButtonStates() {
     startBtn.disabled = state !== 'idle';
@@ -41,6 +70,12 @@
 
   function update(dt) {
     frameCount++;
+
+    if (heldKeys.size > 0) {
+      var net = (heldKeys.has('right') ? 1 : 0) - (heldKeys.has('left') ? 1 : 0);
+      paddleX += net * PADDLE_KEY_SPEED * dt;
+      paddleX = Math.min(Math.max(paddleX, 0), CANVAS_W - PADDLE_W);
+    }
   }
 
   function render() {
@@ -58,6 +93,11 @@
     var x = canvas.width / 2 + Math.sin(t) * (canvas.width / 2 - 30);
     ctx.fillStyle = '#3b82f6';
     ctx.fillRect(x - 10, 80, 20, 20);
+
+    ctx.fillStyle = '#e5e7eb';
+    ctx.strokeStyle = '#9ca3af';
+    ctx.fillRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
+    ctx.strokeRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
 
     if (state === 'paused') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
