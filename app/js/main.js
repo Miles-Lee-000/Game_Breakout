@@ -9,9 +9,12 @@
   var ctx = canvas.getContext('2d');
   var startBtn = document.getElementById('startBtn');
   var pauseBtn = document.getElementById('pauseBtn');
+  var livesEl = document.getElementById('lives');
 
   // SPEC.md §3 constants needed so far.
   var CANVAS_W = 480;
+  var CANVAS_H = 720;
+  var LIVES_START = 3;
   var PADDLE_W = 90;
   var PADDLE_H = 14;
   var PADDLE_Y = 720 - 40;
@@ -37,6 +40,13 @@
   var ballY = 0;
   var ballVx = 0;
   var ballVy = 0;
+
+  var lives = LIVES_START;
+
+  function setLives(n) {
+    lives = n;
+    livesEl.textContent = 'Lives: ' + lives;
+  }
 
   function launchBall() {
     if (state !== 'playing' || !ballWaiting) return;
@@ -138,6 +148,16 @@
       ballY = reflected.y;
       ballVx = reflected.vx;
       ballVy = reflected.vy;
+
+      if (ballY - BALL_RADIUS > CANVAS_H) {
+        setLives(lives - 1);
+        if (lives > 0) {
+          ballWaiting = true;
+        } else {
+          state = 'fail'; // overlay rendering added in Task 19
+          updateButtonStates();
+        }
+      }
     }
   }
 
