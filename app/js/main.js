@@ -16,6 +16,9 @@
   var PADDLE_H = 14;
   var PADDLE_Y = 720 - 40;
   var BALL_RADIUS = 8;
+  // Placeholder until Task 15 wires the full currentLevelSpeed() formula (SPEC §8),
+  // which depends on level/bricksClearedThisLevel state that doesn't exist yet.
+  var BASE_SPEED = 300;
 
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
@@ -26,10 +29,24 @@
 
   var paddleX = (CANVAS_W - PADDLE_W) / 2;
 
-  // Ball state (PLAN.md Task 6). While waiting to launch, the ball has no velocity of
-  // its own and simply tracks the paddle's current x every frame (SPEC §6). Launching
-  // it (Task 7) will introduce ballVx/ballVy and stop this tracking.
+  // Ball state (PLAN.md Task 6/7). While waiting to launch, the ball has no velocity of
+  // its own and simply tracks the paddle's current x every frame (SPEC §6). Once
+  // launched, ballX/ballY/ballVx/ballVy drive its own motion instead.
   var ballWaiting = true;
+  var ballX = 0;
+  var ballY = 0;
+  var ballVx = 0;
+  var ballVy = 0;
+
+  function launchBall() {
+    if (state !== 'playing' || !ballWaiting) return;
+    ballX = paddleX + PADDLE_W / 2;
+    ballY = PADDLE_Y - BALL_RADIUS;
+    var v = window.Launch.generateLaunchVelocity(BASE_SPEED, Math.random);
+    ballVx = v.vx;
+    ballVy = v.vy;
+    ballWaiting = false;
+  }
 
   // Tracks currently-held movement keys via keydown(add)/keyup(remove) rather than
   // relying on the browser re-firing keydown for a held key — see SPEC §4.
@@ -68,11 +85,16 @@
   canvas.addEventListener('touchstart', function (e) {
     var t = e.touches[0];
     if (t) updatePointerXFromEvent(t.clientX, t.clientY);
+    launchBall();
   });
 
   canvas.addEventListener('touchmove', function (e) {
     var t = e.touches[0];
     if (t) updatePointerXFromEvent(t.clientX, t.clientY);
+  });
+
+  canvas.addEventListener('click', function () {
+    launchBall();
   });
 
   function updateButtonStates() {
@@ -106,6 +128,11 @@
       pointerX: pointerX,
       dt: dt,
     });
+
+    if (!ballWaiting) {
+      ballX += ballVx * dt;
+      ballY += ballVy * dt;
+    }
   }
 
   function render() {
@@ -122,14 +149,12 @@
     ctx.fillRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
     ctx.strokeRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
 
-    if (ballWaiting) {
-      var ballX = paddleX + PADDLE_W / 2;
-      var ballY = PADDLE_Y - BALL_RADIUS;
-      ctx.fillStyle = '#f7f7f2';
-      ctx.beginPath();
-      ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    var drawBallX = ballWaiting ? paddleX + PADDLE_W / 2 : ballX;
+    var drawBallY = ballWaiting ? PADDLE_Y - BALL_RADIUS : ballY;
+    ctx.fillStyle = '#f7f7f2';
+    ctx.beginPath();
+    ctx.arc(drawBallX, drawBallY, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
 
     if (state === 'paused') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
