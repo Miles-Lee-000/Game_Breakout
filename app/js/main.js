@@ -1,0 +1,93 @@
+// Game loop skeleton (PLAN.md Task 3). Later tasks extend update()/render() with real
+// paddle/ball/brick simulation and rendering; for now this only proves the loop runs,
+// freezes on Pause, resumes on Pause again, and that Start/Pause behave correctly
+// (no-op + visually disabled) outside their active states, per SPEC §2's button table.
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var startBtn = document.getElementById('startBtn');
+  var pauseBtn = document.getElementById('pauseBtn');
+
+  // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
+  // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
+  // written to extend to those without changing this shape.
+  var state = 'idle';
+  var frameCount = 0;
+  var lastFrameTime = null;
+
+  function updateButtonStates() {
+    startBtn.disabled = state !== 'idle';
+    pauseBtn.disabled = state !== 'playing' && state !== 'paused';
+  }
+
+  startBtn.addEventListener('click', function () {
+    if (state !== 'idle') return; // no-op outside idle, per SPEC §2
+    state = 'playing';
+    updateButtonStates();
+  });
+
+  pauseBtn.addEventListener('click', function () {
+    if (state === 'playing') {
+      state = 'paused';
+    } else if (state === 'paused') {
+      state = 'playing';
+    } else {
+      return; // no-op outside playing/paused, per SPEC §2
+    }
+    updateButtonStates();
+  });
+
+  function update(dt) {
+    frameCount++;
+  }
+
+  function render() {
+    ctx.fillStyle = '#10121a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '16px system-ui, sans-serif';
+    ctx.fillText('frame: ' + frameCount, 12, 24);
+    ctx.fillText('state: ' + state, 12, 44);
+
+    // Debug motion indicator: a small square that visibly moves while playing and
+    // freezes in place otherwise, so Pause/resume behavior is obvious at a glance.
+    var t = frameCount * 0.05;
+    var x = canvas.width / 2 + Math.sin(t) * (canvas.width / 2 - 30);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(x - 10, 80, 20, 20);
+
+    if (state === 'paused') {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  function tick(now) {
+    if (lastFrameTime === null) lastFrameTime = now;
+    var rawDt = (now - lastFrameTime) / 1000;
+    // Updating lastFrameTime on every tick — not only at state-transition moments —
+    // is what satisfies SPEC §9's timer-reset rule: dt computed on the frame after any
+    // idle/paused stretch is naturally small, since lastFrameTime was kept current
+    // throughout, rather than needing an explicit reset hook per transition.
+    lastFrameTime = now;
+    var dt = window.Dt.clampDt(rawDt);
+
+    if (state === 'playing') {
+      update(dt);
+    }
+    render();
+
+    requestAnimationFrame(tick);
+  }
+
+  updateButtonStates();
+  requestAnimationFrame(tick);
+})();
