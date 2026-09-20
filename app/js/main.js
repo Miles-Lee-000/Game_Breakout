@@ -132,6 +132,12 @@
     if (!ballWaiting) {
       ballX += ballVx * dt;
       ballY += ballVy * dt;
+
+      var reflected = window.Walls.reflectOffBoundaries(ballX, ballY, ballVx, ballVy, BALL_RADIUS, CANVAS_W);
+      ballX = reflected.x;
+      ballY = reflected.y;
+      ballVx = reflected.vx;
+      ballVy = reflected.vy;
     }
   }
 
