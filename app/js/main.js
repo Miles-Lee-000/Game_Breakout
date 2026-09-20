@@ -149,6 +149,28 @@
       ballVx = reflected.vx;
       ballVy = reflected.vy;
 
+      var paddleRect = { x: paddleX, y: PADDLE_Y, width: PADDLE_W, height: PADDLE_H };
+      var overlapsPaddle =
+        ballX + BALL_RADIUS > paddleRect.x &&
+        ballX - BALL_RADIUS < paddleRect.x + paddleRect.width &&
+        ballY + BALL_RADIUS > paddleRect.y &&
+        ballY - BALL_RADIUS < paddleRect.y + paddleRect.height;
+
+      if (overlapsPaddle && ballVy > 0) {
+        var axis = window.CollisionAxis.resolveRectCollisionAxis(ballX, ballY, BALL_RADIUS, paddleRect);
+        if (axis === 'y') {
+          var bounce = window.PaddleBounce.paddleTopBounce(ballX, paddleRect.x, paddleRect.width, Math.hypot(ballVx, ballVy));
+          ballVx = bounce.vx;
+          ballVy = bounce.vy;
+          ballY = paddleRect.y - BALL_RADIUS;
+        } else {
+          var sideBounce = window.PaddleBounce.paddleSideBounce(ballVx, ballVy);
+          ballVx = sideBounce.vx;
+          ballVy = sideBounce.vy;
+          ballX = ballX < paddleRect.x + paddleRect.width / 2 ? paddleRect.x - BALL_RADIUS : paddleRect.x + paddleRect.width + BALL_RADIUS;
+        }
+      }
+
       if (ballY - BALL_RADIUS > CANVAS_H) {
         setLives(lives - 1);
         if (lives > 0) {
