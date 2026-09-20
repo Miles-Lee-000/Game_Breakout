@@ -1,0 +1,8 @@
+{
+  "name": "game-breakout-devtools",
+  "private": true,
+  "description": "Dev-only tooling for verifying app/index.html during development (not part of the shipped game, which has no build step or dependencies).",
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
