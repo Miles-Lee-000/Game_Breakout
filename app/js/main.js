@@ -343,6 +343,8 @@
       drawOverlay('Level ' + (currentLevel + 1) + ' Cleared!', '#ffffff');
     } else if (state === 'victory') {
       drawOverlay('Victory', '#22c55e');
+    } else if (state === 'fail') {
+      drawOverlay('Fail', '#ef4444');
     }
   }
 
