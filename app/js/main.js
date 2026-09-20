@@ -15,6 +15,7 @@
   var PADDLE_W = 90;
   var PADDLE_H = 14;
   var PADDLE_Y = 720 - 40;
+  var BALL_RADIUS = 8;
 
   // States used so far: 'idle', 'playing', 'paused'. Later tasks add 'levelClear',
   // 'fail', 'victory' (SPEC §2) — this state variable and updateButtonStates() are
@@ -24,6 +25,11 @@
   var lastFrameTime = null;
 
   var paddleX = (CANVAS_W - PADDLE_W) / 2;
+
+  // Ball state (PLAN.md Task 6). While waiting to launch, the ball has no velocity of
+  // its own and simply tracks the paddle's current x every frame (SPEC §6). Launching
+  // it (Task 7) will introduce ballVx/ballVy and stop this tracking.
+  var ballWaiting = true;
 
   // Tracks currently-held movement keys via keydown(add)/keyup(remove) rather than
   // relying on the browser re-firing keydown for a held key — see SPEC §4.
@@ -111,17 +117,19 @@
     ctx.fillText('frame: ' + frameCount, 12, 24);
     ctx.fillText('state: ' + state, 12, 44);
 
-    // Debug motion indicator: a small square that visibly moves while playing and
-    // freezes in place otherwise, so Pause/resume behavior is obvious at a glance.
-    var t = frameCount * 0.05;
-    var x = canvas.width / 2 + Math.sin(t) * (canvas.width / 2 - 30);
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(x - 10, 80, 20, 20);
-
     ctx.fillStyle = '#e5e7eb';
     ctx.strokeStyle = '#9ca3af';
     ctx.fillRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
     ctx.strokeRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
+
+    if (ballWaiting) {
+      var ballX = paddleX + PADDLE_W / 2;
+      var ballY = PADDLE_Y - BALL_RADIUS;
+      ctx.fillStyle = '#f7f7f2';
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     if (state === 'paused') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
