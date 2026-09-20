@@ -341,6 +341,8 @@
       drawOverlay('Paused', '#ffffff');
     } else if (state === 'levelClear') {
       drawOverlay('Level ' + (currentLevel + 1) + ' Cleared!', '#ffffff');
+    } else if (state === 'victory') {
+      drawOverlay('Victory', '#22c55e');
     }
   }
 
