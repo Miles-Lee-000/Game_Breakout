@@ -326,11 +326,22 @@
     });
 
     if (!ballWaiting) {
-      var speed = Math.hypot(ballVx, ballVy);
-      var n = window.Substep.computeSubstepCount(speed, dt, BALL_RADIUS);
-      var subDt = dt / n;
-      for (var s = 0; s < n; s++) {
+      // Recompute the safe substep size fresh before EVERY substep, not once for the
+      // whole frame: a brick hit can rescale the ball's speed upward mid-frame (SPEC
+      // §8's speed-up), and a substep count/size chosen from the frame's starting
+      // speed would let later substeps that frame move farther than BALL_RADIUS once
+      // the ball is faster -- exactly the kind of stale-sizing bug the anti-tunneling
+      // scheme exists to prevent. Recomputing per substep keeps the guarantee correct
+      // regardless of how many times speed changes within a single frame.
+      var remainingDt = dt;
+      var iterations = 0;
+      while (remainingDt > 1e-9 && iterations < 1000) {
+        var speed = Math.hypot(ballVx, ballVy);
+        var n = window.Substep.computeSubstepCount(speed, remainingDt, BALL_RADIUS);
+        var subDt = remainingDt / n;
         var shouldStop = stepBall(subDt);
+        remainingDt -= subDt;
+        iterations++;
         if (shouldStop || ballWaiting) break;
       }
     }
